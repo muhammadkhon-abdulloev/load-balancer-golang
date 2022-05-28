@@ -1,7 +1,5 @@
 {
-    "proxy": {
-        "port" : "8000"
-    },
+    "port" : "8000", 
     "services" : [
         {
 			"url": "http://localhost:5001/"

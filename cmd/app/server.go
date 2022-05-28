@@ -11,22 +11,25 @@ import (
 	"log"
 )
 
-type Config struct {
-	Proxy    Proxy     `json:"proxy"`
-	Rp *httputil.ReverseProxy
-	Services []Service `json"services"`
+type LoadBalancer struct {
+	Port string `json:"port"`
+	Services []Service
+	current int
+	sync.Mutex
 }
 
-// Proxy is our proxy servers struct (load balancer).
-type Proxy struct {
-	Port string `json:"port"`
-}
 
 // Service is server
 type Service struct {
 	URL    string `json:"url"`
 	IsDead bool
 	mx     sync.RWMutex
+}
+
+func NewLB(port string) *LoadBalancer{
+	return &LoadBalancer{
+		Port: port,
+	}
 }
 
 func (s *Service) SetDead(status bool) {
@@ -42,34 +45,31 @@ func (s *Service) GetIsDead() bool {
 	return status
 }
 
-var mx sync.Mutex
-var idx int = 0
+func (lb *LoadBalancer) Lb(w http.ResponseWriter, r *http.Request) {
+	maxLen := len(lb.Services)
 
-func (c *Config) Lb(w http.ResponseWriter, r *http.Request) {
-	maxLen := len(c.Services)
-
-	mx.Lock()
-	currentService := c.Services[idx%maxLen]
+	lb.Lock()
+	currentService := lb.Services[lb.current%maxLen]
 	if currentService.GetIsDead() {
-		idx++
+		lb.current++
 	}
-	targetURL, err := url.Parse(c.Services[idx%maxLen].URL)
+	targetURL, err := url.Parse(lb.Services[lb.current%maxLen].URL)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
-	idx++
-	mx.Unlock()
-	c.Rp = httputil.NewSingleHostReverseProxy(targetURL)
-	c.Rp.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
+	lb.current++
+	lb.Unlock()
+	rp := httputil.NewSingleHostReverseProxy(targetURL)
+	rp.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
 		log.Printf("%v is dead", targetURL)
 		currentService.SetDead(true)
-		c.Lb(w, r)
+		lb.Lb(w, r)
 	}
-	c.Rp.ServeHTTP(w, r)
+	rp.ServeHTTP(w, r)
 }
 
 func isAlive(url *url.URL) bool {
-	conn, err := net.DialTimeout("tcp", url.Host, time.Second*10)
+	conn, err := net.DialTimeout("tcp", url.Host, time.Millisecond * 500)
 	if err != nil {
 		log.Printf("Can't reach to %v, error: ", err.Error())
 		return false
@@ -78,12 +78,12 @@ func isAlive(url *url.URL) bool {
 	return true
 }
 
-func (c *Config) healthCheck() {
+func (lb *LoadBalancer) healthCheck() {
 	t := time.NewTicker(time.Second * 10)
 	for {
 		select {
 		case <-t.C:
-			for _, service := range c.Services {
+			for _, service := range lb.Services {
 				pingURL, err := url.Parse(service.URL)
 				if err != nil {
 					log.Fatal(err.Error())
@@ -101,13 +101,13 @@ func (c *Config) healthCheck() {
 	}
 }
 
-func (c *Config) Serve() {
+func (lb *LoadBalancer) Serve() {
 
-	go c.healthCheck()
+	go lb.healthCheck()
 
 	s := http.Server{
-		Addr:    ":" + c.Proxy.Port,
-		Handler: http.HandlerFunc(c.Lb),
+		Addr:    ":" + lb.Port,
+		Handler: http.HandlerFunc(lb.Lb),
 	}
 	if err := s.ListenAndServe(); err != nil {
 		log.Fatal(err.Error())

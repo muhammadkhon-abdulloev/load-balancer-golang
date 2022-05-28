@@ -13,7 +13,7 @@ import (
 func main() {
 	// path := os.Getenv("CONFIG_PATH")
 
-	cfg := new(app.Config)
+	cfg := new(app.LoadBalancer)
 	data, err := ioutil.ReadFile("./configs/config.json")
 	if err != nil {
 		log.Fatalf(err.Error())

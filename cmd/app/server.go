@@ -1,18 +1,19 @@
 package app
 
 import (
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"sync"
 	"time"
-
-	log "github.com/sirupsen/logrus"
+	"log"
 )
 
 type Config struct {
 	Proxy    Proxy     `json:"proxy"`
+	Rp *httputil.ReverseProxy
 	Services []Service `json"services"`
 }
 
@@ -58,13 +59,13 @@ func (c *Config) Lb(w http.ResponseWriter, r *http.Request) {
 	}
 	idx++
 	mx.Unlock()
-	rp := httputil.NewSingleHostReverseProxy(targetURL)
-	rp.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
+	c.Rp = httputil.NewSingleHostReverseProxy(targetURL)
+	c.Rp.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
 		log.Printf("%v is dead", targetURL)
 		currentService.SetDead(true)
 		c.Lb(w, r)
 	}
-	rp.ServeHTTP(w, r)
+	c.Rp.ServeHTTP(w, r)
 }
 
 func isAlive(url *url.URL) bool {
@@ -93,7 +94,8 @@ func (c *Config) healthCheck() {
 				if !isAlive {
 					msg = "dead"
 				}
-				log.Printf("service %v checked. status %v", service.URL, msg)
+				lg := fmt.Sprintf("service %v checked. status %v", service.URL, msg)
+				log.Printf(lg)
 			}
 		}
 	}
@@ -111,3 +113,4 @@ func (c *Config) Serve() {
 		log.Fatal(err.Error())
 	}
 }
+

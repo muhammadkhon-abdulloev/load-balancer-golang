@@ -1,0 +1,7 @@
+version: '3.9'
+
+services:
+  lb-golang:
+    image: Dockerfile
+    ports:
+      -"80:8000"

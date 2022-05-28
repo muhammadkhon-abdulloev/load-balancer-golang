@@ -3,13 +3,16 @@ package main
 import (
 	"encoding/json"
 	"io/ioutil"
+	"log"
+	// "os"
 	"sync"
 
 	"github.com/muhammadkhon-abdulloev/load-balancer-go/cmd/app"
-	log "github.com/sirupsen/logrus"
 )
 
 func main() {
+	// path := os.Getenv("CONFIG_PATH")
+
 	cfg := new(app.Config)
 	data, err := ioutil.ReadFile("./configs/config.json")
 	if err != nil {
@@ -18,8 +21,8 @@ func main() {
 	json.Unmarshal(data, &cfg)
 
 	wg := new(sync.WaitGroup)
-	wg.Add(5)
-
+	
+	wg.Add(1)
 	go func ()  {
 		cfg.Serve()
 		wg.Done()	

@@ -1,64 +1,41 @@
 package app
 
 import (
-	"fmt"
-	"net"
+	"context"
+	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"sync"
 	"time"
-	"log"
+
+	"github.com/muhammadkhon-abdulloev/load-balancer-go/pkg/service"
 )
 
 type LoadBalancer struct {
-	Port string `json:"port"`
-	Services []Service
-	current int
-	sync.Mutex
-}
-
-
-// Service is server
-type Service struct {
-	URL    string `json:"url"`
-	IsDead bool
-	mx     sync.RWMutex
-}
-
-func NewLB(port string) *LoadBalancer{
-	return &LoadBalancer{
-		Port: port,
-	}
-}
-
-func (s *Service) SetDead(status bool) {
-	s.mx.Lock()
-	s.IsDead = status
-	s.mx.Unlock()
-}
-
-func (s *Service) GetIsDead() bool {
-	s.mx.RLock()
-	status := s.IsDead
-	s.mx.RUnlock()
-	return status
+	httpServer *http.Server
+	Port       string `json:"port"`
+	Services   []service.Service
+	current    int
+	sync.RWMutex
 }
 
 func (lb *LoadBalancer) Lb(w http.ResponseWriter, r *http.Request) {
 	maxLen := len(lb.Services)
 
-	lb.Lock()
+	lb.RLock()
 	currentService := lb.Services[lb.current%maxLen]
 	if currentService.GetIsDead() {
 		lb.current++
+		lb.RUnlock()
+		lb.Lb(w, r)
 	}
 	targetURL, err := url.Parse(lb.Services[lb.current%maxLen].URL)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
 	lb.current++
-	lb.Unlock()
+	lb.RUnlock()
 	rp := httputil.NewSingleHostReverseProxy(targetURL)
 	rp.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
 		log.Printf("%v is dead", targetURL)
@@ -68,49 +45,40 @@ func (lb *LoadBalancer) Lb(w http.ResponseWriter, r *http.Request) {
 	rp.ServeHTTP(w, r)
 }
 
-func isAlive(url *url.URL) bool {
-	conn, err := net.DialTimeout("tcp", url.Host, time.Millisecond * 500)
-	if err != nil {
-		log.Printf("Can't reach to %v, error: ", err.Error())
-		return false
-	}
-	defer conn.Close()
-	return true
-}
-
 func (lb *LoadBalancer) healthCheck() {
 	t := time.NewTicker(time.Second * 10)
 	for {
 		select {
 		case <-t.C:
-			for _, service := range lb.Services {
-				pingURL, err := url.Parse(service.URL)
+			for _, svc := range lb.Services {
+				pingURL, err := url.Parse(svc.URL)
 				if err != nil {
 					log.Fatal(err.Error())
 				}
-				isAlive := isAlive(pingURL)
-				service.SetDead(!isAlive)
+				isAlive := service.IsAlive(pingURL)
+				svc.SetDead(!isAlive)
 				msg := "ok"
 				if !isAlive {
 					msg = "dead"
 				}
-				lg := fmt.Sprintf("service %v checked. status %v", service.URL, msg)
-				log.Printf(lg)
+				log.Printf("service %v checked. status %v", svc.URL, msg)
 			}
 		}
 	}
 }
 
-func (lb *LoadBalancer) Serve() {
+func (lb *LoadBalancer) Serve() error {
 
 	go lb.healthCheck()
 
-	s := http.Server{
+	lb.httpServer = &http.Server{
 		Addr:    ":" + lb.Port,
 		Handler: http.HandlerFunc(lb.Lb),
 	}
-	if err := s.ListenAndServe(); err != nil {
-		log.Fatal(err.Error())
-	}
+	return lb.httpServer.ListenAndServe()
+
 }
 
+func (lb *LoadBalancer) Shutdown(ctx context.Context) error {
+	return lb.httpServer.Shutdown(ctx)
+}

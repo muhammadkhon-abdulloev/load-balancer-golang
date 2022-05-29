@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/muhammadkhon-abdulloev/load-balancer-go/pkg/service"
 	"github.com/stretchr/testify/require"
 )
 
@@ -21,8 +22,9 @@ func TestServer_Lb(t *testing.T) {
 	}))
 	defer targetTwo.Close()
 
-	lb := NewLB(":8000")
-	lb.Services = []Service{
+	lb := new(LoadBalancer)
+	lb.Port = ":8000"
+	lb.Services = []service.Service{
 		{URL: targetOne.URL},
 		{URL: targetTwo.URL},
 	}
@@ -45,8 +47,4 @@ func TestServer_Lb(t *testing.T) {
 	expected := "Hello, one"
 
 	require.Equal(t, expected, string(result), "They must be equal")
-}
-
-func TestServer(t *testing.T) {
-
 }

@@ -2,19 +2,19 @@
     "port" : "8000", 
     "services" : [
         {
-			"url": "http://localhost:5001/"
+			"url": "http://127.0.0.1:5000/"
 		},
 		{
-			"url": "http://localhost:5002/"
+			"url": "http://127.0.0.2:5000/"
 		},
 		{
-			"url": "http://localhost:5003/"
+			"url": "http://127.0.0.3:5000/"
 		},
 		{
-			"url": "http://localhost:5004/"
+			"url": "http://127.0.0.4:5000/"
 		},
 		{
-			"url": "http://localhost:5005/"
+			"url": "http://127.0.0.5:5000/"
 		}
     ]
 }

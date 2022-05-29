@@ -36,8 +36,8 @@ func TestService_SetDead(t *testing.T) {
 		} else {
 			testCase.testService.SetDead(true)
 		}
-		if ok := assert.Equal(t, testCase.expected, testCase.testService.IsDead); !ok {
-			t.Errorf("Incorrect result. expected %v, got %v", testCase.expected, testCase.testService.IsDead)
+		if ok := assert.Equal(t, testCase.expected, testCase.testService.isDead); !ok {
+			t.Errorf("Incorrect result. expected %v, got %v", testCase.expected, testCase.testService.isDead)
 		}
 	}
 
@@ -57,7 +57,7 @@ func TestService_GetIsDead(t *testing.T) {
 		{
 			testService: Service{
 				URL: "dead",
-				IsDead: true,
+				isDead: true,
 			},
 			expected: true,
 		},
@@ -66,13 +66,13 @@ func TestService_GetIsDead(t *testing.T) {
 	for _, testCase := range testTable {
 		var result bool
 		if testCase.testService.URL == "alive" {
-			result = testCase.testService.GetIsDead()
+			result = testCase.testService.IsDead()
 		} else {
-			result = testCase.testService.GetIsDead()
+			result = testCase.testService.IsDead()
 		}
 		
 		if ok := assert.Equal(t, testCase.expected, result); !ok {
-			t.Errorf("Incorrect result. expected %v, got %v", testCase.expected, testCase.testService.IsDead)
+			t.Errorf("Incorrect result. expected %v, got %v", testCase.expected, testCase.testService.isDead)
 		}
 	}
 }

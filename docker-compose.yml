@@ -1,7 +1,11 @@
-version: '3.9'
+version: '3.3'
 
 services:
-  lb-golang:
-    image: Dockerfile
+  go-lb:
+    build:
+      dockerfile: ./docker/Dockerfile
+    image: go-lb
+    container_name: go-lb
+    network_mode: "host"
     ports:
-      -"80:8000"
+      - "8000:8000"

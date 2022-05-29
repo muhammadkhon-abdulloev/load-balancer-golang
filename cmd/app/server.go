@@ -16,7 +16,7 @@ type LoadBalancer struct {
 	httpServer *http.Server
 	Port       string `json:"port"`
 	Services   []service.Service
-	current    int
+	currentSvc int
 	sync.RWMutex
 }
 
@@ -24,17 +24,15 @@ func (lb *LoadBalancer) Lb(w http.ResponseWriter, r *http.Request) {
 	maxLen := len(lb.Services)
 
 	lb.RLock()
-	currentService := lb.Services[lb.current%maxLen]
-	if currentService.GetIsDead() {
-		lb.current++
-		lb.RUnlock()
-		lb.Lb(w, r)
+	currentService := lb.Services[lb.currentSvc%maxLen]
+	if currentService.IsDead() {
+		lb.currentSvc++
 	}
-	targetURL, err := url.Parse(lb.Services[lb.current%maxLen].URL)
+	targetURL, err := url.Parse(lb.Services[lb.currentSvc%maxLen].URL)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
-	lb.current++
+	lb.currentSvc++
 	lb.RUnlock()
 	rp := httputil.NewSingleHostReverseProxy(targetURL)
 	rp.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
